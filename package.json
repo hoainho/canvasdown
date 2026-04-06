@@ -1,0 +1,65 @@
+{
+  "name": "canvasdown",
+  "version": "0.1.0",
+  "description": "Markdown renderer for Canvas. No DOM. No reflow. Runs anywhere.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./stream": {
+      "import": "./dist/stream.js",
+      "types": "./dist/stream.d.ts"
+    },
+    "./advanced": {
+      "import": "./dist/advanced.js",
+      "types": "./dist/advanced.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react.js",
+      "types": "./dist/react.d.ts"
+    },
+    "./worker": {
+      "import": "./dist/worker-bridge.js",
+      "types": "./dist/worker-bridge.d.ts"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "node serve.cjs",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "markdown", "canvas", "renderer", "pretext", "text-layout",
+    "no-dom", "og-image", "streaming", "ai-chat", "webgl",
+    "node", "typescript", "animation", "virtual-list"
+  ],
+  "author": "canvasdown contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nhoxtvt/canvasdown.git"
+  },
+  "homepage": "https://github.com/nhoxtvt/canvasdown#readme",
+  "bugs": { "url": "https://github.com/nhoxtvt/canvasdown/issues" },
+  "dependencies": {
+    "@chenglou/pretext": "^0.0.4",
+    "marked": "^17.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/node": "^22.0.0"
+  },
+  "peerDependencies": {
+    "@napi-rs/canvas": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@napi-rs/canvas": { "optional": true }
+  },
+  "engines": { "node": ">=18.0.0" }
+}

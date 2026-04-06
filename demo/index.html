@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>canvasdown — Canvas Markdown Renderer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet" />
+  <script type="importmap">
+  {
+    "imports": {
+      "marked": "../node_modules/marked/lib/marked.esm.js",
+      "@chenglou/pretext": "../node_modules/@chenglou/pretext/dist/layout.js"
+    }
+  }
+  </script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #09090b;
+      --surface:      #111113;
+      --surface-2:    #18181b;
+      --border:       #27272a;
+      --border-2:     #3f3f46;
+      --text:         #fafafa;
+      --text-2:       #a1a1aa;
+      --muted:        #52525b;
+      --accent:       #f97316;
+      --accent-dim:   rgba(249,115,22,0.12);
+      --accent-glow:  rgba(249,115,22,0.25);
+      --font-mono:    'DM Mono', monospace;
+      --font-sans:    'DM Sans', sans-serif;
+      --font-display: 'Playfair Display', serif;
+      --toolbar-h:    56px;
+      --statusbar-h:  28px;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ─────────────── Scrollbar ─────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* ─────────────── Toolbar ─────────────── */
+    .toolbar {
+      height: var(--toolbar-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 16px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
+    }
+
+    .logo {
+      display: flex;
+      align-items: baseline;
+      gap: 2px;
+      margin-right: auto;
+      text-decoration: none;
+    }
+
+    .logo-mark {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 22px;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+
+    .logo-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      margin-left: 1px;
+      margin-bottom: 2px;
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.2; }
+    }
+
+    .logo-sub {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      margin-left: 10px;
+      text-transform: uppercase;
+      align-self: center;
+    }
+
+    /* Controls group */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .divider {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+    }
+
+    /* Width slider */
+    .width-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .width-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .slider-track {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 120px;
+      height: 2px;
+      background: var(--border-2);
+      outline: none;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 0 3px var(--accent-dim);
+      transition: box-shadow 0.15s;
+    }
+
+    input[type="range"]:hover::-webkit-slider-thumb {
+      box-shadow: 0 0 0 5px var(--accent-glow);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      background: var(--accent);
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .width-badge {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      min-width: 52px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Buttons */
+    .btn {
+      height: 32px;
+      padding: 0 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-2);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      border-color: var(--border-2);
+      color: var(--text);
+      background: var(--surface-2);
+    }
+
+    .btn svg { opacity: 0.7; transition: opacity 0.15s; }
+    .btn:hover svg { opacity: 1; }
+
+    .btn-export {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-export::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.08);
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .btn-export:hover::before { opacity: 1; }
+
+    .btn-export:hover {
+      box-shadow: 0 0 20px var(--accent-glow);
+      border-color: var(--accent);
+    }
+
+    .btn-export:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-theme {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 0.03em;
+      min-width: 80px;
+      justify-content: center;
+    }
+
+    /* ─────────────── Split layout ─────────────── */
+    .workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ─────────────── Editor pane ─────────────── */
+    .editor-pane {
+      display: flex;
+      flex-direction: column;
+      width: 44%;
+      min-width: 280px;
+      max-width: 70%;
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .pane-bar {
+      height: 36px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      flex-shrink: 0;
+      gap: 8px;
+    }
+
+    .pane-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      flex: 1;
+    }
+
+    .pane-meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .dot-row {
+      display: flex;
+      gap: 5px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .dot-r { background: #ff5f57; }
+    .dot-y { background: #febc2e; }
+    .dot-g { background: #28c840; }
+
+    .editor-scroll {
+      flex: 1;
+      overflow: auto;
+      position: relative;
+    }
+
+    .editor-inner {
+      display: flex;
+      min-height: 100%;
+    }
+
+    .line-nums {
+      flex-shrink: 0;
+      padding: 20px 0 20px 12px;
+      width: 44px;
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--muted);
+      user-select: none;
+      border-right: 1px solid var(--border);
+      pointer-events: none;
+    }
+
+    #editor {
+      flex: 1;
+      background: transparent;
+      color: var(--text);
+      border: none;
+      resize: none;
+      padding: 20px 20px 20px 16px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.7;
+      outline: none;
+      caret-color: var(--accent);
+      tab-size: 2;
+    }
+
+    #editor::selection {
+      background: var(--accent-dim);
+    }
+
+    /* ─────────────── Resize handle ─────────────── */
+    .resize-handle {
+      width: 4px;
+      background: transparent;
+      cursor: col-resize;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 5;
+      transition: background 0.15s;
+    }
+
+    .resize-handle:hover,
+    .resize-handle.dragging {
+      background: var(--accent);
+    }
+
+    .resize-handle::after {
+      content: '';
+      position: absolute;
+      inset: 0 -6px;
+    }
+
+    /* ─────────────── Preview pane ─────────────── */
+    .preview-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .preview-scroll {
+      flex: 1;
+      overflow: auto;
+      background: var(--bg);
+      position: relative;
+    }
+
+    /* Dot grid background */
+    .preview-scroll::before {
+      content: '';
+      position: fixed;
+      inset: var(--toolbar-h) 0 var(--statusbar-h) 44%;
+      background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+      background-size: 24px 24px;
+      opacity: 0.5;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .canvas-stage {
+      position: relative;
+      z-index: 1;
+      padding: 40px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100%;
+    }
+
+    #output {
+      display: block;
+      border-radius: 8px;
+      box-shadow:
+        0 0 0 1px var(--border),
+        0 4px 16px rgba(0,0,0,0.5),
+        0 24px 64px rgba(0,0,0,0.4),
+        0 48px 80px -16px var(--accent-dim);
+      animation: canvas-in 0.4s ease-out;
+      transition: box-shadow 0.3s ease;
+    }
+
+    #output:hover {
+      box-shadow:
+        0 0 0 1px var(--border-2),
+        0 4px 16px rgba(0,0,0,0.5),
+        0 24px 64px rgba(0,0,0,0.5),
+        0 48px 80px -8px var(--accent-glow);
+    }
+
+    @keyframes canvas-in {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─────────────── Status bar ─────────────── */
+    .statusbar {
+      height: var(--statusbar-h);
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 20px;
+      flex-shrink: 0;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .status-item .label {
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .status-item .value {
+      color: var(--text-2);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    #render-stats {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ─────────────── Keyboard hint ─────────────── */
+    .kbd {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1px 5px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Toolbar ── -->
+<header class="toolbar">
+  <a class="logo" href="#">
+    <span class="logo-mark">canvasdown</span>
+    <span class="logo-dot"></span>
+    <span class="logo-sub">v0.1.0</span>
+  </a>
+
+  <div class="controls">
+    <div class="width-wrap">
+      <span class="width-label">Width</span>
+      <input type="range" id="width-slider" min="400" max="1200" step="10" value="760" />
+      <span class="width-badge" id="width-display">760px</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="btn btn-theme" id="theme-toggle">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 018 14V2.5z"/>
+      </svg>
+      Dark
+    </button>
+
+    <button class="btn btn-export" id="export-btn">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M7.47 10.78a.75.75 0 001.06 0l3.75-3.75a.75.75 0 00-1.06-1.06L8.75 8.44V1.75a.75.75 0 00-1.5 0v6.69L4.78 5.97a.75.75 0 00-1.06 1.06l3.75 3.75zM3.75 13a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5z"/>
+      </svg>
+      Export PNG
+    </button>
+  </div>
+</header>
+
+<!-- ── Workspace ── -->
+<div class="workspace">
+
+  <!-- Editor pane -->
+  <div class="editor-pane" id="editor-pane">
+    <div class="pane-bar">
+      <div class="dot-row">
+        <div class="dot dot-r"></div>
+        <div class="dot dot-y"></div>
+        <div class="dot dot-g"></div>
+      </div>
+      <span class="pane-label" style="margin-left:8px">Markdown</span>
+      <span class="pane-meta" id="char-count">0 chars</span>
+    </div>
+    <div class="editor-scroll" id="editor-scroll">
+      <div class="editor-inner">
+        <div class="line-nums" id="line-nums">1</div>
+        <textarea id="editor" spellcheck="false" autocomplete="off"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resize handle -->
+  <div class="resize-handle" id="resize-handle"></div>
+
+  <!-- Preview pane -->
+  <div class="preview-pane">
+    <div class="pane-bar">
+      <span class="pane-label">Canvas Preview</span>
+      <span class="pane-meta" style="font-size:10px;opacity:0.5">no DOM reflow</span>
+    </div>
+    <div class="preview-scroll" id="preview-scroll">
+      <div class="canvas-stage">
+        <canvas id="output"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Status bar ── -->
+<footer class="statusbar">
+  <div class="status-item">
+    <div class="status-dot"></div>
+    <span class="value">Pretext</span>
+  </div>
+  <div class="status-item">
+    <span class="label">Engine</span>
+    <span class="value">Canvas 2D</span>
+  </div>
+  <div class="status-item">
+    <span class="label">Font</span>
+    <span class="value">DM Mono · Inter</span>
+  </div>
+  <span id="render-stats"></span>
+</footer>
+
+<script type="module">
+  import { render, exportPNG, darkTheme, lightTheme } from '../dist/index.js'
+
+  const editor     = document.getElementById('editor')
+  const canvas     = document.getElementById('output')
+  const themeBtn   = document.getElementById('theme-toggle')
+  const exportBtn  = document.getElementById('export-btn')
+  const slider     = document.getElementById('width-slider')
+  const widthLabel = document.getElementById('width-display')
+  const charCount  = document.getElementById('char-count')
+  const statsEl    = document.getElementById('render-stats')
+  const lineNums   = document.getElementById('line-nums')
+  const editorScroll = document.getElementById('editor-scroll')
+
+  let currentTheme = 'dark'
+  let renderWidth  = 760
+  let rafId        = null
+
+  const SAMPLE_MD = `# Canvas Markdown Renderer
+
+A pure-canvas markdown renderer powered by **Pretext** — no DOM layout, no reflow.
+
+## Features
+
+- Accurate text measurement via \`@chenglou/pretext\`
+- Zero DOM reads during layout computation
+- Renders to Canvas, exportable as **PNG**
+- Light & dark themes
+- Supports *all* markdown inline formatting
+
+## How it works
+
+\`\`\`typescript
+import { render, exportPNG } from 'canvasdown'
+
+// Render to canvas — no DOM reflow
+render(markdownString, canvasElement, {
+  width: 800,
+  theme: 'dark',
+})
+
+// Export as @2x PNG
+const dataURL = await exportPNG(markdownString, { width: 1200 })
+\`\`\`
+
+## Why canvas?
+
+Browsers measure text by triggering **layout reflow** — one of the most expensive
+operations in the rendering pipeline. Pretext sidesteps this entirely using
+canvas \`measureText()\` as ground truth, making layout arithmetic-only.
+
+> "The returned height is the crucial last piece for unlocking proper virtualization,
+> masonry layouts, and preventing layout shift." — Pretext README
+
+## Inline formatting
+
+Mixing **bold**, *italic*, \`code\`, and ***bold italic*** in the same paragraph
+wraps correctly because Pretext measures each span independently with the right font.
+
+---
+
+Made with [pretext](https://github.com/chenglou/pretext) · MIT License`
+
+  editor.value = SAMPLE_MD
+  updateLineNumbers()
+
+  function scheduleRender() {
+    if (rafId) cancelAnimationFrame(rafId)
+    rafId = requestAnimationFrame(doRender)
+  }
+
+  function doRender() {
+    const md = editor.value
+    charCount.textContent = `${md.length} chars`
+
+    const theme = currentTheme === 'dark' ? darkTheme : lightTheme
+    const t0 = performance.now()
+
+    try {
+      render(md, canvas, { width: renderWidth, theme, devicePixelRatio: window.devicePixelRatio })
+      const ms = (performance.now() - t0).toFixed(2)
+      const h = (canvas.height / window.devicePixelRatio) | 0
+      statsEl.textContent = `rendered in ${ms}ms · ${renderWidth}×${h}px · @${window.devicePixelRatio}x`
+    } catch (err) {
+      console.error(err)
+      statsEl.textContent = `error: ${err.message}`
+    }
+  }
+
+  function updateLineNumbers() {
+    const lines = editor.value.split('\n').length
+    lineNums.textContent = Array.from({ length: lines }, (_, i) => i + 1).join('\n')
+  }
+
+  editor.addEventListener('input', () => {
+    updateLineNumbers()
+    scheduleRender()
+  })
+
+  editor.addEventListener('scroll', () => {
+    lineNums.style.marginTop = `-${editor.scrollTop}px`
+  })
+
+  slider.addEventListener('input', () => {
+    renderWidth = Number(slider.value)
+    widthLabel.textContent = `${renderWidth}px`
+    scheduleRender()
+  })
+
+  themeBtn.addEventListener('click', () => {
+    currentTheme = currentTheme === 'dark' ? 'light' : 'dark'
+    const isDark = currentTheme === 'dark'
+    themeBtn.innerHTML = isDark
+      ? `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 1.5A5.5 5.5 0 018 14V2.5z"/></svg> Dark`
+      : `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="4"/><path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M3.05 3.05l1.06 1.06M11.89 11.89l1.06 1.06M3.05 12.95l1.06-1.06M11.89 4.11l1.06-1.06" stroke="currentColor" stroke-width="1.5"/></svg> Light`
+    document.documentElement.style.setProperty('--bg', isDark ? '#09090b' : '#f4f4f5')
+    document.documentElement.style.setProperty('--surface', isDark ? '#111113' : '#ffffff')
+    document.documentElement.style.setProperty('--surface-2', isDark ? '#18181b' : '#f9f9f9')
+    document.documentElement.style.setProperty('--border', isDark ? '#27272a' : '#e4e4e7')
+    document.documentElement.style.setProperty('--border-2', isDark ? '#3f3f46' : '#d4d4d8')
+    document.documentElement.style.setProperty('--text', isDark ? '#fafafa' : '#09090b')
+    document.documentElement.style.setProperty('--text-2', isDark ? '#a1a1aa' : '#52525b')
+    document.documentElement.style.setProperty('--muted', isDark ? '#52525b' : '#a1a1aa')
+    scheduleRender()
+  })
+
+  exportBtn.addEventListener('click', async () => {
+    const theme = currentTheme === 'dark' ? darkTheme : lightTheme
+    exportBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" style="animation:spin 0.6s linear infinite"><path d="M8 1a7 7 0 017 7h-1.5A5.5 5.5 0 008 2.5V1z"/></svg> Exporting...`
+    exportBtn.disabled = true
+    try {
+      const dataURL = await exportPNG(editor.value, { width: renderWidth, theme, devicePixelRatio: 2 })
+      const a = document.createElement('a')
+      a.href = dataURL
+      a.download = 'canvasdown-export.png'
+      a.click()
+    } finally {
+      exportBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M7.47 10.78a.75.75 0 001.06 0l3.75-3.75a.75.75 0 00-1.06-1.06L8.75 8.44V1.75a.75.75 0 00-1.5 0v6.69L4.78 5.97a.75.75 0 00-1.06 1.06l3.75 3.75zM3.75 13a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5z"/></svg> Export PNG`
+      exportBtn.disabled = false
+    }
+  })
+
+  // ── Resizable split pane ──
+  const handle = document.getElementById('resize-handle')
+  const editorPane = document.getElementById('editor-pane')
+  let isResizing = false
+  let startX = 0
+  let startWidth = 0
+
+  handle.addEventListener('mousedown', (e) => {
+    isResizing = true
+    startX = e.clientX
+    startWidth = editorPane.offsetWidth
+    handle.classList.add('dragging')
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  })
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return
+    const delta = e.clientX - startX
+    const newWidth = Math.max(280, Math.min(startWidth + delta, window.innerWidth * 0.7))
+    editorPane.style.width = `${newWidth}px`
+  })
+
+  document.addEventListener('mouseup', () => {
+    if (!isResizing) return
+    isResizing = false
+    handle.classList.remove('dragging')
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  })
+
+  // ── Spin animation for export ──
+  const style = document.createElement('style')
+  style.textContent = `@keyframes spin { to { transform: rotate(360deg); } }`
+  document.head.appendChild(style)
+
+  scheduleRender()
+</script>
+</body>
+</html>
