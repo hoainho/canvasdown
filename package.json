@@ -43,10 +43,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nhoxtvt/canvasdown.git"
+    "url": "https://github.com/hoainho/canvasdown.git"
   },
-  "homepage": "https://github.com/nhoxtvt/canvasdown#readme",
-  "bugs": { "url": "https://github.com/nhoxtvt/canvasdown/issues" },
+  "homepage": "https://github.com/hoainho/canvasdown#readme",
+  "bugs": { "url": "https://github.com/hoainho/canvasdown/issues" },
   "dependencies": {
     "@chenglou/pretext": "^0.0.4",
     "marked": "^17.0.0"

@@ -499,7 +499,7 @@ anim.start()
 ## Development
 
 ```bash
-git clone https://github.com/nhoxtvt/canvasdown
+git clone https://github.com/hoainho/canvasdown
 cd canvasdown
 npm install
 npm run build    # compile TypeScript → dist/
